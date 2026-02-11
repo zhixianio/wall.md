@@ -678,7 +678,7 @@ function generateRoomHtml(room: Room, lang: Lang, baseUrl?: string): string {
 			background: linear-gradient(90deg, transparent, #f59e0b, transparent);
 		}
 		.anchor-icon {
-			margin: 0 1rem;
+			margin: 0 0.5rem;
 			font-size: 1.5rem;
 			animation: pulse 2s ease-in-out infinite;
 		}
@@ -690,7 +690,7 @@ function generateRoomHtml(room: Room, lang: Lang, baseUrl?: string): string {
 			font-weight: 600;
 			color: #f59e0b;
 			font-size: 1.1rem;
-			margin: 0 1rem;
+			margin: 0 0.5rem;
 			text-shadow: 0 1px 2px rgba(0,0,0,0.1);
 			word-wrap: break-word;
 			overflow-wrap: break-word;
