@@ -24,8 +24,8 @@ export const RATE_LIMIT = {
  * Then follow the instructions to write to KV using wrangler.
  */
 export const ROOMS: Room[] = [
-	{ id: "clawcon", name: "🦞 ClawCon HK", description: "room.clawcon" },
-	{ id: "lobby", name: "🏠 Lobby", description: "room.lobby" },
+	{ id: "clawcon", name: "🦞 ClawCon HK", description: "room.clawcon", anchorSecret: "clawcon-anchor-2026" },
+	{ id: "lobby", name: "🏠 Lobby", description: "room.lobby", anchorSecret: "lobby-anchor-2026" },
 ];
 
 // Language types and translations
@@ -127,22 +127,32 @@ export async function getRooms(env: Env): Promise<Room[]> {
 		return roomsCache;
 	}
 
+	// Start with hardcoded rooms
+	const allRooms = [...ROOMS];
+
+	// Add dynamic rooms from KV
 	const raw = await env.CLAWCON_MESSAGES.get("rooms:list");
-	if (!raw) {
-		// No rooms in KV yet, return empty array
-		roomsCache = [];
-		return [];
+	if (raw) {
+		try {
+			const parsed = JSON.parse(raw);
+			if (Array.isArray(parsed)) {
+				// Merge, KV rooms override hardcoded ones with same id
+				for (const kvRoom of parsed) {
+					const idx = allRooms.findIndex(r => r.id === kvRoom.id);
+					if (idx >= 0) {
+						allRooms[idx] = kvRoom;
+					} else {
+						allRooms.push(kvRoom);
+					}
+				}
+			}
+		} catch (e) {
+			console.error("[getRooms] Failed to parse rooms:list:", e);
+		}
 	}
 
-	try {
-		const parsed = JSON.parse(raw);
-		roomsCache = Array.isArray(parsed) ? parsed : [];
-		return roomsCache;
-	} catch (e) {
-		console.error("[getRooms] Failed to parse rooms:list:", e);
-		roomsCache = [];
-		return [];
-	}
+	roomsCache = allRooms;
+	return allRooms;
 }
 
 /**
