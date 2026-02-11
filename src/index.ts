@@ -613,11 +613,11 @@ function generateRoomHtml(room: Room, lang: Lang, baseUrl?: string): string {
 			gap: 8px;
 			margin-bottom: 6px;
 		}
-		.message-name { font-weight: 600; font-size: 15px; }
-		.message-time { color: rgba(255,255,255,0.4); font-size: 12px; }
+		.message-name { font-weight: 600; font-size: 13px; }
+		.message-time { color: rgba(255,255,255,0.4); font-size: 11px; }
 		.message-content {
 			color: rgba(255,255,255,0.9);
-			font-size: 16px;
+			font-size: 14px;
 			line-height: 1.5;
 			word-wrap: break-word;
 		}
