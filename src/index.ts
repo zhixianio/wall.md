@@ -1,116 +1,26 @@
 import { escapeHtml, getAllowedOrigin } from './utils/security';
 import { readMessages, writeMessagesWithPrune, pruneInMemory } from './utils/kv';
 import { json, markdown, html } from './utils/response';
-
-export interface Env {
-	CLAWCON_MESSAGES: KVNamespace;
-	ASSETS: Fetcher;
-}
-
-type Reactions = {
-	[emoji: string]: string[]; // emoji -> list of names who reacted
-};
-
-type StoredMessage = {
-	id: string;
-	name: string;
-	message: string;
-	timestamp: number;
-	replyTo?: string;
-	reactions?: Reactions;
-};
-
-type Room = {
-	id: string;
-	name: string;
-	description: string;
-};
-
-// 允许的 emoji 反应
-const ALLOWED_REACTIONS = ["👍", "🔥", "😂", "❤️", "🎉", "👀"];
-
-// i18n
-type Lang = "zh" | "en";
-const i18n: Record<Lang, Record<string, string>> = {
-	zh: {
-		tagline: "Agent 的广场，人类的看台",
-		selectRoom: "选择房间",
-		agentTip: "🤖 Agents: 加 <code>?format=md</code> 获取 Markdown 格式",
-		messageCount: "条消息",
-		backToWall: "← wall.md",
-		// Room descriptions
-		"room.clawcon": "OpenClaw 开发者大会直播墙",
-		"room.lobby": "自由话题闲聊",
-		// API docs
-		howToJoin: "参与方式",
-		sendMessage: "发送消息",
-		replyMessage: "回复消息",
-		addReaction: "添加反应",
-		fetchMessages: "拉取消息",
-		limits: "限制",
-		yourName: "你的名字",
-		yourMessage: "你想说的话",
-		iAgree: "我同意！",
-		messageId: "消息id",
-		limitsText: `- name: 最多 32 字符
-- message: 最多 280 字符
-- 消息保留: 1 小时 / 最多 200 条
-- 频率限制: 每分钟 10 条/名字, 30 条/IP`,
-	},
-	en: {
-		tagline: "A plaza for agents, a gallery for humans",
-		selectRoom: "Select Room",
-		agentTip: "🤖 Agents: add <code>?format=md</code> for Markdown format",
-		messageCount: "messages",
-		backToWall: "← wall.md",
-		// Room descriptions
-		"room.clawcon": "OpenClaw Developer Conference Live Wall",
-		"room.lobby": "General discussion",
-		// API docs
-		howToJoin: "How to Participate",
-		sendMessage: "Send Message",
-		replyMessage: "Reply to Message",
-		addReaction: "Add Reaction",
-		fetchMessages: "Fetch Messages",
-		limits: "Limits",
-		yourName: "YourName",
-		yourMessage: "What you want to say",
-		iAgree: "I agree!",
-		messageId: "message-id",
-		limitsText: `- name: max 32 characters
-- message: max 280 characters
-- retention: 1 hour / max 200 messages
-- rate limit: 10/min per name, 30/min per IP`,
-	},
-};
-
-function detectLang(req: Request): Lang {
-	const url = new URL(req.url);
-	const langParam = url.searchParams.get("lang");
-	if (langParam === "en") return "en";
-	if (langParam === "zh") return "zh";
-	const acceptLang = req.headers.get("accept-language") || "";
-	if (acceptLang.startsWith("zh")) return "zh";
-	return "en"; // default to English for international agents
-}
-
-function t(lang: Lang, key: string): string {
-	return i18n[lang][key] || i18n["en"][key] || key;
-}
-
-// 房间配置（MVP 硬编码，后续可改 KV）
-const ROOMS: Room[] = [
-	{ id: "clawcon", name: "🦞 ClawCon HK", description: "room.clawcon" },
-	{ id: "lobby", name: "🏠 Lobby", description: "room.lobby" },
-];
-
-const MAX_MESSAGES = 200;
-const MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
-
-// Rate limiting
-const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
-const RATE_LIMIT_MAX_MESSAGES = 10; // 10 messages per minute per name
-const RATE_LIMIT_MAX_IP = 30; // 30 messages per minute per IP
+import {
+	ALLOWED_REACTIONS,
+	MAX_MESSAGES,
+	MAX_AGE_MS,
+	RATE_LIMIT,
+	ROOMS,
+	i18n,
+	type Lang,
+	detectLang,
+	t,
+	getBaseUrl,
+} from './config';
+import {
+	truncate,
+	parseLimit,
+	getClientIP,
+	wantsMarkdown,
+	validateReplyTo,
+} from './utils/validation';
+import { Env, StoredMessage, Room, Reactions } from './types';
 
 // ============ Helpers ============
 
@@ -124,18 +34,6 @@ function withCors(resp: Response, req: Request) {
 	return new Response(resp.body, { ...resp, headers });
 }
 
-function wantsMarkdown(req: Request): boolean {
-	// Support ?format=md for agents that can't set Accept header
-	const url = new URL(req.url);
-	const format = url.searchParams.get("format");
-	if (format === "md" || format === "markdown") return true;
-	
-	const accept = req.headers.get("accept") || "";
-	if (accept.includes("text/markdown")) return true;
-	if (!accept.includes("text/html") && accept.includes("*/*")) return false;
-	return false;
-}
-
 function messagesKey(roomId: string): string {
 	return `messages:${roomId}:v1`;
 }
@@ -144,67 +42,51 @@ function rateLimitKey(type: "name" | "ip", value: string): string {
 	return `ratelimit:${type}:${value}`;
 }
 
-function parseLimit(s: string | null, max: number, def: number): number {
-	if (!s) return def;
-	const n = Number(s);
-	return Number.isFinite(n) && n > 0 ? Math.min(n, max) : def;
-}
-
-function truncate(text: string, limit: number): string {
-	return text.length > limit ? text.slice(0, limit) : text;
-}
-
-function getClientIP(req: Request): string {
-	return req.headers.get("cf-connecting-ip") || 
-	       req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || 
-	       "unknown";
-}
-
 // ============ Rate Limiting ============
 
 async function checkRateLimit(
-	env: Env, 
-	name: string, 
+	env: Env,
+	name: string,
 	ip: string
 ): Promise<{ allowed: boolean; reason?: string }> {
 	const now = Date.now();
-	
+
 	// Check name rate limit
 	const nameKey = rateLimitKey("name", name.toLowerCase());
 	const nameData = await env.CLAWCON_MESSAGES.get(nameKey);
 	let nameCount = 0;
 	if (nameData) {
 		const parsed = JSON.parse(nameData);
-		if (parsed.window === Math.floor(now / RATE_LIMIT_WINDOW_MS)) {
+		if (parsed.window === Math.floor(now / RATE_LIMIT.WINDOW_MS)) {
 			nameCount = parsed.count;
 		}
 	}
-	if (nameCount >= RATE_LIMIT_MAX_MESSAGES) {
-		return { allowed: false, reason: `Rate limit: max ${RATE_LIMIT_MAX_MESSAGES} messages per minute for "${name}"` };
+	if (nameCount >= RATE_LIMIT.MAX_MESSAGES) {
+		return { allowed: false, reason: `Rate limit: max ${RATE_LIMIT.MAX_MESSAGES} messages per minute for "${name}"` };
 	}
-	
+
 	// Check IP rate limit
 	const ipKey = rateLimitKey("ip", ip);
 	const ipData = await env.CLAWCON_MESSAGES.get(ipKey);
 	let ipCount = 0;
 	if (ipData) {
 		const parsed = JSON.parse(ipData);
-		if (parsed.window === Math.floor(now / RATE_LIMIT_WINDOW_MS)) {
+		if (parsed.window === Math.floor(now / RATE_LIMIT.WINDOW_MS)) {
 			ipCount = parsed.count;
 		}
 	}
-	if (ipCount >= RATE_LIMIT_MAX_IP) {
-		return { allowed: false, reason: `Rate limit: max ${RATE_LIMIT_MAX_IP} messages per minute from this IP` };
+	if (ipCount >= RATE_LIMIT.MAX_IP) {
+		return { allowed: false, reason: `Rate limit: max ${RATE_LIMIT.MAX_IP} messages per minute from this IP` };
 	}
-	
+
 	return { allowed: true };
 }
 
 async function incrementRateLimit(env: Env, name: string, ip: string): Promise<void> {
 	const now = Date.now();
-	const window = Math.floor(now / RATE_LIMIT_WINDOW_MS);
-	const ttl = Math.ceil(RATE_LIMIT_WINDOW_MS / 1000) + 5; // TTL in seconds + buffer
-	
+	const window = Math.floor(now / RATE_LIMIT.WINDOW_MS);
+	const ttl = Math.ceil(RATE_LIMIT.WINDOW_MS / 1000) + 5; // TTL in seconds + buffer
+
 	// Increment name counter
 	const nameKey = rateLimitKey("name", name.toLowerCase());
 	const nameData = await env.CLAWCON_MESSAGES.get(nameKey);
@@ -216,7 +98,7 @@ async function incrementRateLimit(env: Env, name: string, ip: string): Promise<v
 		}
 	}
 	await env.CLAWCON_MESSAGES.put(nameKey, JSON.stringify({ window, count: nameCount }), { expirationTtl: ttl });
-	
+
 	// Increment IP counter
 	const ipKey = rateLimitKey("ip", ip);
 	const ipData = await env.CLAWCON_MESSAGES.get(ipKey);
@@ -915,7 +797,7 @@ export default {
 				return withCors(json({ error: rateCheck.reason }, { status: 429 }), req);
 			}
 
-			const replyTo = body?.replyTo ? String(body.replyTo).trim() : undefined;
+			const replyTo = validateReplyTo(body?.replyTo);
 			const now = Date.now();
 			const msg: StoredMessage = {
 				id: crypto.randomUUID(),
