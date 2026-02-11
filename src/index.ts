@@ -563,12 +563,12 @@ function generateRoomHtml(room: Room, lang: Lang, baseUrl?: string): string {
 				display: none;
 			}
 			.anchor-text {
-				font-size: 0.9rem;
-				max-width: 80%;
+				font-size: 0.8rem;
+				max-width: 85%;
 			}
 			.anchor-icon {
-				font-size: 1.2rem;
-				margin: 0 0.5rem;
+				font-size: 1rem;
+				margin: 0 0.4rem;
 			}
 			.msg-anchor {
 				margin: 1.5rem 0;
@@ -679,7 +679,7 @@ function generateRoomHtml(room: Room, lang: Lang, baseUrl?: string): string {
 		}
 		.anchor-icon {
 			margin: 0 0.5rem;
-			font-size: 1.5rem;
+			font-size: 1.1rem;
 			animation: pulse 2s ease-in-out infinite;
 		}
 		@keyframes pulse {
@@ -689,7 +689,7 @@ function generateRoomHtml(room: Room, lang: Lang, baseUrl?: string): string {
 		.anchor-text {
 			font-weight: 600;
 			color: #f59e0b;
-			font-size: 1.1rem;
+			font-size: 0.9rem;
 			margin: 0 0.5rem;
 			text-shadow: 0 1px 2px rgba(0,0,0,0.1);
 			word-wrap: break-word;
