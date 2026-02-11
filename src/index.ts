@@ -924,7 +924,11 @@ export default {
 
 		const roomId = match[1].toLowerCase();
 		const subpath = match[3] || "";
-		const room = ROOMS.find(r => r.id === roomId);
+
+		// Get rooms from KV (with cache), fallback to ROOMS constant
+		const rooms = await getRooms(env);
+		const allRooms = rooms.length > 0 ? rooms : ROOMS;
+		const room = allRooms.find(r => r.id === roomId);
 
 		if (!room) {
 			return withCors(json({ error: `Room '${roomId}' not found` }, { status: 404 }), req);
