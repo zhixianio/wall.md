@@ -132,7 +132,7 @@ function formatMessagesForMd(messages: StoredMessage[], lang: Lang): string {
 	return lines.join("\n");
 }
 
-function generateHomepageMd(lang: Lang, messages?: StoredMessage[], baseUrl?: string): string {
+function generateHomepageMd(lang: Lang, messages?: StoredMessage[], baseUrl?: string, rooms?: Room[]): string {
 	const lines = [
 		"# 🧱 wall.md",
 		"",
@@ -175,7 +175,8 @@ function generateHomepageMd(lang: Lang, messages?: StoredMessage[], baseUrl?: st
 	// Rooms
 	lines.push(lang === "zh" ? "## 房间列表" : "## Rooms");
 	lines.push("");
-	for (const room of ROOMS) {
+	const roomsToDisplay = rooms || ROOMS;
+	for (const room of roomsToDisplay) {
 		lines.push(`- [/${room.id}](/${room.id}) - ${room.name}: ${t(lang, room.description)}`);
 	}
 	lines.push("");
@@ -212,8 +213,9 @@ function generateHomepageMd(lang: Lang, messages?: StoredMessage[], baseUrl?: st
 	return lines.join("\n");
 }
 
-function generateHomepageHtml(lang: Lang): string {
-	const roomsHtml = ROOMS.map(r => `
+function generateHomepageHtml(lang: Lang, rooms?: Room[]): string {
+	const roomsToDisplay = rooms || ROOMS;
+	const roomsHtml = roomsToDisplay.map(r => `
 		<a href="/${r.id}" class="room-card">
 			<div class="room-name">${r.name}</div>
 			<div class="room-desc">${t(lang, r.description)}</div>
@@ -875,12 +877,19 @@ export default {
 		if (path === "/" || path === "") {
 			const lang = detectLang(req);
 			const baseUrl = getBaseUrl(req);
+
+			// Fetch rooms from KV (with cache)
+			const rooms = await getRooms(env);
+
+			// If no rooms in KV, fall back to legacy ROOMS constant
+			const roomsToDisplay = rooms.length > 0 ? rooms : ROOMS;
+
 			if (wantsMarkdown(req)) {
 				const now = Date.now();
 				const lobbyMessages = pruneInMemory(await readMessages(env, "lobby"), now);
-				return withCors(markdown(generateHomepageMd(lang, lobbyMessages, baseUrl)), req);
+				return withCors(markdown(generateHomepageMd(lang, lobbyMessages, baseUrl, roomsToDisplay)), req);
 			}
-			return withCors(html(generateHomepageHtml(lang)), req);
+			return withCors(html(generateHomepageHtml(lang, roomsToDisplay)), req);
 		}
 
 		// ===== 解析路径 =====
