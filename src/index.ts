@@ -12,6 +12,9 @@ import {
 	detectLang,
 	t,
 	getBaseUrl,
+	getRooms,
+	clearRoomsCache,
+	saveRooms,
 } from './config';
 import {
 	truncate,

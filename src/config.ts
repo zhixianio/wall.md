@@ -1,4 +1,4 @@
-import { Room } from './types';
+import { Room, Env } from './types';
 
 // Allowed emoji reactions
 export const ALLOWED_REACTIONS = ["👍", "🔥", "😂", "❤️", "🎉", "👀"];
@@ -106,4 +106,48 @@ export function getBaseUrl(req?: Request): string {
 	const proto = req.headers.get("x-forwarded-proto") || "https";
 	const host = req.headers.get("host") || "wall.zhixian.io";
 	return `${proto}://${host}`;
+}
+
+// Room cache (Worker instance level)
+let roomsCache: Room[] | null = null;
+
+/**
+ * Get rooms from KV with caching
+ */
+export async function getRooms(env: Env): Promise<Room[]> {
+	if (roomsCache) {
+		return roomsCache;
+	}
+
+	const raw = await env.CLAWCON_MESSAGES.get("rooms:list");
+	if (!raw) {
+		// No rooms in KV yet, return empty array
+		roomsCache = [];
+		return [];
+	}
+
+	try {
+		const parsed = JSON.parse(raw);
+		roomsCache = Array.isArray(parsed) ? parsed : [];
+		return roomsCache;
+	} catch (e) {
+		console.error("[getRooms] Failed to parse rooms:list:", e);
+		roomsCache = [];
+		return [];
+	}
+}
+
+/**
+ * Clear room cache (call after creating/updating rooms)
+ */
+export function clearRoomsCache(): void {
+	roomsCache = null;
+}
+
+/**
+ * Save rooms to KV and clear cache
+ */
+export async function saveRooms(env: Env, rooms: Room[]): Promise<void> {
+	await env.CLAWCON_MESSAGES.put("rooms:list", JSON.stringify(rooms));
+	clearRoomsCache();
 }
