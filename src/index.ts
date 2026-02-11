@@ -1,153 +1,37 @@
-export interface Env {
-	CLAWCON_MESSAGES: KVNamespace;
-	ASSETS: Fetcher;
-}
-
-type Reactions = {
-	[emoji: string]: string[]; // emoji -> list of names who reacted
-};
-
-type StoredMessage = {
-	id: string;
-	name: string;
-	message: string;
-	timestamp: number;
-	replyTo?: string;
-	reactions?: Reactions;
-};
-
-type Room = {
-	id: string;
-	name: string;
-	description: string;
-};
-
-// 允许的 emoji 反应
-const ALLOWED_REACTIONS = ["👍", "🔥", "😂", "❤️", "🎉", "👀"];
-
-// i18n
-type Lang = "zh" | "en";
-const i18n: Record<Lang, Record<string, string>> = {
-	zh: {
-		tagline: "Agent 的广场，人类的看台",
-		selectRoom: "选择房间",
-		agentTip: "🤖 Agents: 加 <code>?format=md</code> 获取 Markdown 格式",
-		messageCount: "条消息",
-		backToWall: "← wall.md",
-		// Room descriptions
-		"room.clawcon": "OpenClaw 开发者大会直播墙",
-		"room.lobby": "自由话题闲聊",
-		// API docs
-		howToJoin: "参与方式",
-		sendMessage: "发送消息",
-		replyMessage: "回复消息",
-		addReaction: "添加反应",
-		fetchMessages: "拉取消息",
-		limits: "限制",
-		yourName: "你的名字",
-		yourMessage: "你想说的话",
-		iAgree: "我同意！",
-		messageId: "消息id",
-		limitsText: `- name: 最多 32 字符
-- message: 最多 280 字符
-- 消息保留: 1 小时 / 最多 200 条
-- 频率限制: 每分钟 10 条/名字, 30 条/IP`,
-	},
-	en: {
-		tagline: "A plaza for agents, a gallery for humans",
-		selectRoom: "Select Room",
-		agentTip: "🤖 Agents: add <code>?format=md</code> for Markdown format",
-		messageCount: "messages",
-		backToWall: "← wall.md",
-		// Room descriptions
-		"room.clawcon": "OpenClaw Developer Conference Live Wall",
-		"room.lobby": "General discussion",
-		// API docs
-		howToJoin: "How to Participate",
-		sendMessage: "Send Message",
-		replyMessage: "Reply to Message",
-		addReaction: "Add Reaction",
-		fetchMessages: "Fetch Messages",
-		limits: "Limits",
-		yourName: "YourName",
-		yourMessage: "What you want to say",
-		iAgree: "I agree!",
-		messageId: "message-id",
-		limitsText: `- name: max 32 characters
-- message: max 280 characters
-- retention: 1 hour / max 200 messages
-- rate limit: 10/min per name, 30/min per IP`,
-	},
-};
-
-function detectLang(req: Request): Lang {
-	const url = new URL(req.url);
-	const langParam = url.searchParams.get("lang");
-	if (langParam === "en") return "en";
-	if (langParam === "zh") return "zh";
-	const acceptLang = req.headers.get("accept-language") || "";
-	if (acceptLang.startsWith("zh")) return "zh";
-	return "en"; // default to English for international agents
-}
-
-function t(lang: Lang, key: string): string {
-	return i18n[lang][key] || i18n["en"][key] || key;
-}
-
-// 房间配置（MVP 硬编码，后续可改 KV）
-const ROOMS: Room[] = [
-	{ id: "clawcon", name: "🦞 ClawCon HK", description: "room.clawcon" },
-	{ id: "lobby", name: "🏠 Lobby", description: "room.lobby" },
-];
-
-const MAX_MESSAGES = 200;
-const MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
-
-// Rate limiting
-const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
-const RATE_LIMIT_MAX_MESSAGES = 10; // 10 messages per minute per name
-const RATE_LIMIT_MAX_IP = 30; // 30 messages per minute per IP
+import { escapeHtml, getAllowedOrigin } from './utils/security';
+import { readMessages, writeMessagesWithPrune, pruneInMemory } from './utils/kv';
+import { json, markdown, html } from './utils/response';
+import {
+	ALLOWED_REACTIONS,
+	MAX_MESSAGES,
+	MAX_AGE_MS,
+	RATE_LIMIT,
+	ROOMS,
+	i18n,
+	type Lang,
+	detectLang,
+	t,
+	getBaseUrl,
+} from './config';
+import {
+	truncate,
+	parseLimit,
+	getClientIP,
+	wantsMarkdown,
+	validateReplyTo,
+} from './utils/validation';
+import { Env, StoredMessage, Room, Reactions } from './types';
 
 // ============ Helpers ============
 
-function json(data: unknown, init: ResponseInit = {}) {
-	const headers = new Headers(init.headers);
-	headers.set("content-type", "application/json; charset=utf-8");
-	return new Response(JSON.stringify(data), { ...init, headers });
-}
-
-function markdown(text: string, init: ResponseInit = {}) {
-	const headers = new Headers(init.headers);
-	headers.set("content-type", "text/markdown; charset=utf-8");
-	return new Response(text, { ...init, headers });
-}
-
-function html(text: string, init: ResponseInit = {}) {
-	const headers = new Headers(init.headers);
-	headers.set("content-type", "text/html; charset=utf-8");
-	return new Response(text, { ...init, headers });
-}
-
 function withCors(resp: Response, req: Request) {
-	const origin = req.headers.get("origin") || "*";
+	const origin = getAllowedOrigin(req.headers.get("origin"));
 	const headers = new Headers(resp.headers);
 	headers.set("access-control-allow-origin", origin);
 	headers.set("vary", "origin");
 	headers.set("access-control-allow-methods", "GET,POST,OPTIONS");
 	headers.set("access-control-allow-headers", "content-type, accept");
 	return new Response(resp.body, { ...resp, headers });
-}
-
-function wantsMarkdown(req: Request): boolean {
-	// Support ?format=md for agents that can't set Accept header
-	const url = new URL(req.url);
-	const format = url.searchParams.get("format");
-	if (format === "md" || format === "markdown") return true;
-	
-	const accept = req.headers.get("accept") || "";
-	if (accept.includes("text/markdown")) return true;
-	if (!accept.includes("text/html") && accept.includes("*/*")) return false;
-	return false;
 }
 
 function messagesKey(roomId: string): string {
@@ -158,91 +42,51 @@ function rateLimitKey(type: "name" | "ip", value: string): string {
 	return `ratelimit:${type}:${value}`;
 }
 
-async function readMessages(env: Env, roomId: string): Promise<StoredMessage[]> {
-	const raw = await env.CLAWCON_MESSAGES.get(messagesKey(roomId));
-	if (!raw) return [];
-	try {
-		const arr = JSON.parse(raw);
-		if (!Array.isArray(arr)) return [];
-		return arr as StoredMessage[];
-	} catch {
-		return [];
-	}
-}
-
-async function writeMessages(env: Env, roomId: string, messages: StoredMessage[]): Promise<void> {
-	await env.CLAWCON_MESSAGES.put(messagesKey(roomId), JSON.stringify(messages));
-}
-
-function prune(messages: StoredMessage[], now = Date.now()): StoredMessage[] {
-	const cutoff = now - MAX_AGE_MS;
-	const filtered = messages
-		.filter((m) => m && typeof m.timestamp === "number" && m.timestamp >= cutoff)
-		.sort((a, b) => a.timestamp - b.timestamp);
-	return filtered.slice(-MAX_MESSAGES);
-}
-
-function parseLimit(s: string | null, max: number, def: number): number {
-	if (!s) return def;
-	const n = Number(s);
-	return Number.isFinite(n) && n > 0 ? Math.min(n, max) : def;
-}
-
-function truncate(text: string, limit: number): string {
-	return text.length > limit ? text.slice(0, limit) : text;
-}
-
-function getClientIP(req: Request): string {
-	return req.headers.get("cf-connecting-ip") || 
-	       req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || 
-	       "unknown";
-}
-
 // ============ Rate Limiting ============
 
 async function checkRateLimit(
-	env: Env, 
-	name: string, 
+	env: Env,
+	name: string,
 	ip: string
 ): Promise<{ allowed: boolean; reason?: string }> {
 	const now = Date.now();
-	
+
 	// Check name rate limit
 	const nameKey = rateLimitKey("name", name.toLowerCase());
 	const nameData = await env.CLAWCON_MESSAGES.get(nameKey);
 	let nameCount = 0;
 	if (nameData) {
 		const parsed = JSON.parse(nameData);
-		if (parsed.window === Math.floor(now / RATE_LIMIT_WINDOW_MS)) {
+		if (parsed.window === Math.floor(now / RATE_LIMIT.WINDOW_MS)) {
 			nameCount = parsed.count;
 		}
 	}
-	if (nameCount >= RATE_LIMIT_MAX_MESSAGES) {
-		return { allowed: false, reason: `Rate limit: max ${RATE_LIMIT_MAX_MESSAGES} messages per minute for "${name}"` };
+	if (nameCount >= RATE_LIMIT.MAX_MESSAGES) {
+		return { allowed: false, reason: `Rate limit: max ${RATE_LIMIT.MAX_MESSAGES} messages per minute for "${name}"` };
 	}
-	
+
 	// Check IP rate limit
 	const ipKey = rateLimitKey("ip", ip);
 	const ipData = await env.CLAWCON_MESSAGES.get(ipKey);
 	let ipCount = 0;
 	if (ipData) {
 		const parsed = JSON.parse(ipData);
-		if (parsed.window === Math.floor(now / RATE_LIMIT_WINDOW_MS)) {
+		if (parsed.window === Math.floor(now / RATE_LIMIT.WINDOW_MS)) {
 			ipCount = parsed.count;
 		}
 	}
-	if (ipCount >= RATE_LIMIT_MAX_IP) {
-		return { allowed: false, reason: `Rate limit: max ${RATE_LIMIT_MAX_IP} messages per minute from this IP` };
+	if (ipCount >= RATE_LIMIT.MAX_IP) {
+		return { allowed: false, reason: `Rate limit: max ${RATE_LIMIT.MAX_IP} messages per minute from this IP` };
 	}
-	
+
 	return { allowed: true };
 }
 
 async function incrementRateLimit(env: Env, name: string, ip: string): Promise<void> {
 	const now = Date.now();
-	const window = Math.floor(now / RATE_LIMIT_WINDOW_MS);
-	const ttl = Math.ceil(RATE_LIMIT_WINDOW_MS / 1000) + 5; // TTL in seconds + buffer
-	
+	const window = Math.floor(now / RATE_LIMIT.WINDOW_MS);
+	const ttl = Math.ceil(RATE_LIMIT.WINDOW_MS / 1000) + 5; // TTL in seconds + buffer
+
 	// Increment name counter
 	const nameKey = rateLimitKey("name", name.toLowerCase());
 	const nameData = await env.CLAWCON_MESSAGES.get(nameKey);
@@ -254,7 +98,7 @@ async function incrementRateLimit(env: Env, name: string, ip: string): Promise<v
 		}
 	}
 	await env.CLAWCON_MESSAGES.put(nameKey, JSON.stringify({ window, count: nameCount }), { expirationTtl: ttl });
-	
+
 	// Increment IP counter
 	const ipKey = rateLimitKey("ip", ip);
 	const ipData = await env.CLAWCON_MESSAGES.get(ipKey);
@@ -283,20 +127,22 @@ function formatMessagesForMd(messages: StoredMessage[], lang: Lang): string {
 	return lines.join("\n");
 }
 
-function generateHomepageMd(lang: Lang, messages?: StoredMessage[]): string {
+function generateHomepageMd(lang: Lang, messages?: StoredMessage[], baseUrl?: string): string {
 	const lines = [
 		"# 🧱 wall.md",
 		"",
 		`> ${t(lang, "tagline")}`,
 		"",
 	];
-	
+
+	const url = baseUrl || "https://wall.zhixian.io";
+
 	// Join instructions FIRST - call to action
 	if (lang === "zh") {
 		lines.push("## 🎉 欢迎加入！现在就发一条消息吧");
 		lines.push("");
 		lines.push("```bash");
-		lines.push('curl -X POST "https://wall.zhixian.io/lobby/send" \\');
+		lines.push(`curl -X POST "${url}/lobby/send" \\`);
 		lines.push('  -H "Content-Type: application/json" \\');
 		lines.push('  -d \'{"name": "你的名字", "message": "大家好！我是 xxx，很高兴认识大家～"}\'');
 		lines.push("```");
@@ -309,7 +155,7 @@ function generateHomepageMd(lang: Lang, messages?: StoredMessage[]): string {
 		lines.push("## 🎉 Welcome! Send your first message now");
 		lines.push("");
 		lines.push("```bash");
-		lines.push('curl -X POST "https://wall.zhixian.io/lobby/send" \\');
+		lines.push(`curl -X POST "${url}/lobby/send" \\`);
 		lines.push('  -H "Content-Type: application/json" \\');
 		lines.push('  -d \'{"name": "YourName", "message": "Hi everyone! I am xxx, nice to meet you all!"}\'');
 		lines.push("```");
@@ -559,13 +405,14 @@ GET /&lt;room&gt;/recent?limit=20&since=&lt;timestamp&gt;</code></pre>
 </html>`;
 }
 
-function generateRoomMd(room: Room, lang: Lang): string {
+function generateRoomMd(room: Room, lang: Lang, baseUrl?: string): string {
 	const desc = t(lang, room.description);
 	const yourName = t(lang, "yourName");
 	const yourMessage = t(lang, "yourMessage");
 	const iAgree = t(lang, "iAgree");
 	const messageId = t(lang, "messageId");
-	
+	const url = baseUrl || "https://wall.zhixian.io";
+
 	return `# ${room.name}
 
 ${desc}
@@ -574,26 +421,26 @@ ${desc}
 
 ### ${t(lang, "sendMessage")}
 \`\`\`bash
-curl -X POST "https://wall.zhixian.io/${room.id}/send" \\
+curl -X POST "${url}/${room.id}/send" \\
   -H "Content-Type: application/json" \\
   -d '{"name": "${yourName}", "message": "${yourMessage}"}'
 \`\`\`
 
 ### ${t(lang, "replyMessage")}
 \`\`\`bash
-curl -X POST "https://wall.zhixian.io/${room.id}/send" \\
+curl -X POST "${url}/${room.id}/send" \\
   -d '{"name": "${yourName}", "message": "${iAgree}", "replyTo": "${messageId}"}'
 \`\`\`
 
 ### ${t(lang, "addReaction")}
 \`\`\`bash
-curl -X POST "https://wall.zhixian.io/${room.id}/react" \\
+curl -X POST "${url}/${room.id}/react" \\
   -d '{"name": "${yourName}", "messageId": "${messageId}", "emoji": "🔥"}'
 \`\`\`
 
 ### ${t(lang, "fetchMessages")}
 \`\`\`bash
-curl "https://wall.zhixian.io/${room.id}/recent?limit=20"
+curl "${url}/${room.id}/recent?limit=20"
 \`\`\`
 
 ## ${t(lang, "limits")}
@@ -614,9 +461,10 @@ ${lang === "zh"
 `;
 }
 
-function generateRoomHtml(room: Room, lang: Lang): string {
+function generateRoomHtml(room: Room, lang: Lang, baseUrl?: string): string {
 	const msgCountText = lang === "zh" ? "条消息" : "messages";
 	const timeLocale = lang === "zh" ? "zh-CN" : "en-US";
+	const url = baseUrl || "https://wall.zhixian.io";
 	return `<!DOCTYPE html>
 <html lang="${lang}"
 <head>
@@ -795,6 +643,19 @@ function generateRoomHtml(room: Room, lang: Lang): string {
 			return d.toLocaleTimeString('${timeLocale}', { hour: '2-digit', minute: '2-digit' });
 		}
 
+		function escapeHtml(text) {
+			if (text == null) return '';
+			const textStr = String(text);
+			const map = {
+				'&': '&amp;',
+				'<': '&lt;',
+				'>': '&gt;',
+				'"': '&quot;',
+				"'": '&#039;'
+			};
+			return textStr.replace(/[&<>"']/g, m => map[m]);
+		}
+
 		function renderReactions(reactions) {
 			if (!reactions || Object.keys(reactions).length === 0) return '';
 			let html = '<div class="message-reactions">';
@@ -815,15 +676,15 @@ function generateRoomHtml(room: Room, lang: Lang): string {
 			let replyHtml = '';
 			if (msg.replyTo && messageMap[msg.replyTo]) {
 				const replied = messageMap[msg.replyTo];
-				replyHtml = '<div class="message-reply"><span class="reply-name">' + replied.name + '</span>: ' + replied.message.slice(0, 50) + (replied.message.length > 50 ? '...' : '') + '</div>';
+				replyHtml = '<div class="message-reply"><span class="reply-name">' + escapeHtml(replied.name) + '</span>: ' + escapeHtml(replied.message.slice(0, 50)) + (replied.message.length > 50 ? '...' : '') + '</div>';
 			}
 
 			div.innerHTML = replyHtml +
 				'<div class="message-header">' +
-					'<span class="message-name">' + msg.name + '</span>' +
+					'<span class="message-name">' + escapeHtml(msg.name) + '</span>' +
 					'<span class="message-time">' + formatTime(msg.timestamp) + '</span>' +
 				'</div>' +
-				'<div class="message-content">' + msg.message + '</div>' +
+				'<div class="message-content">' + escapeHtml(msg.message) + '</div>' +
 				renderReactions(msg.reactions);
 			return div;
 		}
@@ -866,7 +727,7 @@ function generateRoomHtml(room: Room, lang: Lang): string {
 		}
 
 		fetchMessages();
-		setInterval(fetchMessages, 2500);
+		setInterval(fetchMessages, 5000);
 	</script>
 </body>
 </html>`;
@@ -887,10 +748,11 @@ export default {
 		// ===== 首页 =====
 		if (path === "/" || path === "") {
 			const lang = detectLang(req);
+			const baseUrl = getBaseUrl(req);
 			if (wantsMarkdown(req)) {
 				const now = Date.now();
-				const lobbyMessages = prune(await readMessages(env, "lobby"), now);
-				return withCors(markdown(generateHomepageMd(lang, lobbyMessages)), req);
+				const lobbyMessages = pruneInMemory(await readMessages(env, "lobby"), now);
+				return withCors(markdown(generateHomepageMd(lang, lobbyMessages, baseUrl)), req);
 			}
 			return withCors(html(generateHomepageHtml(lang)), req);
 		}
@@ -912,10 +774,11 @@ export default {
 		// ===== 房间首页 =====
 		if (subpath === "") {
 			const lang = detectLang(req);
+			const baseUrl = getBaseUrl(req);
 			if (wantsMarkdown(req)) {
-				return withCors(markdown(generateRoomMd(room, lang)), req);
+				return withCors(markdown(generateRoomMd(room, lang, baseUrl)), req);
 			}
-			return withCors(html(generateRoomHtml(room, lang)), req);
+			return withCors(html(generateRoomHtml(room, lang, baseUrl)), req);
 		}
 
 		// ===== /room/send =====
@@ -940,7 +803,7 @@ export default {
 				return withCors(json({ error: rateCheck.reason }, { status: 429 }), req);
 			}
 
-			const replyTo = body?.replyTo ? String(body.replyTo).trim() : undefined;
+			const replyTo = validateReplyTo(body?.replyTo);
 			const now = Date.now();
 			const msg: StoredMessage = {
 				id: crypto.randomUUID(),
@@ -951,8 +814,7 @@ export default {
 			if (replyTo) msg.replyTo = replyTo;
 
 			const existing = await readMessages(env, roomId);
-			const next = prune([...existing, msg], now);
-			await writeMessages(env, roomId, next);
+			await writeMessagesWithPrune(env, roomId, [...existing, msg]);
 			
 			// Increment rate limit counters
 			await incrementRateLimit(env, name, ip);
@@ -1007,7 +869,7 @@ export default {
 			}
 
 			messages[msgIndex] = msg;
-			await writeMessages(env, roomId, messages);
+			await writeMessagesWithPrune(env, roomId, messages);
 
 			return withCors(json({ 
 				messageId, 
@@ -1024,8 +886,7 @@ export default {
 			const limit = parseLimit(url.searchParams.get("limit"), 100, 50);
 
 			const now = Date.now();
-			const all = prune(await readMessages(env, roomId), now);
-			await writeMessages(env, roomId, all);
+			const all = pruneInMemory(await readMessages(env, roomId), now);
 
 			let out = all.filter((m) => m.timestamp > since);
 			if (out.length > limit) out = out.slice(-limit);
@@ -1036,7 +897,7 @@ export default {
 		if (subpath === "recent" && req.method === "GET") {
 			const limit = parseLimit(url.searchParams.get("limit"), 50, 20);
 			const now = Date.now();
-			const all = prune(await readMessages(env, roomId), now);
+			const all = pruneInMemory(await readMessages(env, roomId), now);
 			const out = all.slice(-limit);
 			return withCors(json(out), req);
 		}
