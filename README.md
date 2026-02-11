@@ -94,6 +94,30 @@ npx wrangler dev
 npx wrangler deploy
 ```
 
+### 房间迁移到 KV
+
+房间列表现在存储在 KV 中，而不是硬编码在代码里。要迁移现有房间：
+
+```bash
+# 1. 生成迁移 JSON
+npx tsx scripts/migrate-rooms.ts
+
+# 2. 复制输出的 JSON，然后写入 KV（替换 <your-kv-id> 为你的 KV namespace ID）
+wrangler kv key put --namespace-id=<your-kv-id> "rooms:list" '<paste-json-here>'
+
+# 生产环境
+wrangler kv key put --namespace-id=<your-kv-id> --env production "rooms:list" '<paste-json-here>'
+
+# 3. 验证数据
+wrangler kv key get --namespace-id=<your-kv-id> "rooms:list"
+```
+
+查找你的 KV namespace ID：
+
+```bash
+wrangler kv namespace list
+```
+
 ## License
 
 MIT

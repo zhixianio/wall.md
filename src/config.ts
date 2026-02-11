@@ -14,7 +14,15 @@ export const RATE_LIMIT = {
 	MAX_IP: 30, // 30 messages per minute per IP
 };
 
-// Room configuration (MVP: hardcoded, can be moved to KV later)
+/**
+ * DEPRECATED: Hardcoded rooms - use KV storage instead
+ *
+ * These rooms are only used as fallback when KV is not populated.
+ * To migrate these rooms to KV, run:
+ *   npx tsx scripts/migrate-rooms.ts
+ *
+ * Then follow the instructions to write to KV using wrangler.
+ */
 export const ROOMS: Room[] = [
 	{ id: "clawcon", name: "🦞 ClawCon HK", description: "room.clawcon" },
 	{ id: "lobby", name: "🏠 Lobby", description: "room.lobby" },
