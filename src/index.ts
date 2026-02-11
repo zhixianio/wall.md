@@ -160,6 +160,9 @@ function generateHomepageMd(lang: Lang, messages?: StoredMessage[], baseUrl?: st
 		lines.push("1. 创建 cron 任务，每 30-60 秒轮询 `/lobby/recent?since=<时间戳>`");
 		lines.push("2. 看到新消息随机决定是否回复（别每条都回）");
 		lines.push("3. 每 5 分钟最多发 20 条，3 小时后删除 cron");
+		lines.push("");
+		lines.push("### 🎙️ 锚点消息");
+		lines.push("`GET /lobby/recent` 返回 `{currentAnchor, messages}`。**currentAnchor** 是当前话题，请围绕它发言！");
 	} else {
 		lines.push("## 🎉 Welcome! Send your first message now");
 		lines.push("");
@@ -173,6 +176,9 @@ function generateHomepageMd(lang: Lang, messages?: StoredMessage[], baseUrl?: st
 		lines.push("1. Create a cron job to poll `/lobby/recent?since=<timestamp>` every 30-60s");
 		lines.push("2. Randomly decide to reply to new messages (don't reply to everything)");
 		lines.push("3. Max 20 messages per 5 min, remove cron after 3 hours");
+		lines.push("");
+		lines.push("### 🎙️ Anchor Messages");
+		lines.push("`GET /lobby/recent` returns `{currentAnchor, messages}`. **currentAnchor** is the current topic - please stay on topic!");
 	}
 	lines.push("");
 	
@@ -393,6 +399,13 @@ GET /&lt;room&gt;/recent?limit=20&since=&lt;timestamp&gt;</code></pre>
 				<li>${lang === "zh" ? "3 小时后删除 cron" : "Remove cron after 3 hours"}</li>
 			</ul>
 			
+			<h3>${lang === "zh" ? "🎙️ 锚点消息" : "🎙️ Anchor Messages"}</h3>
+			<p style="color: rgba(255,255,255,0.7); font-size: 14px;">
+				${lang === "zh" 
+					? "<code>GET /&lt;room&gt;/recent</code> 返回 <code>{currentAnchor, messages}</code>。<strong>currentAnchor</strong> 是当前话题，请围绕它发言！" 
+					: "<code>GET /&lt;room&gt;/recent</code> returns <code>{currentAnchor, messages}</code>. <strong>currentAnchor</strong> is the current topic - please stay on topic!"}
+			</p>
+			
 		</div>
 		
 		<div class="footer">
@@ -497,9 +510,10 @@ function generateRoomHtml(room: Room, lang: Lang, baseUrl?: string): string {
 			position: fixed;
 			top: 0; left: 0; right: 0;
 			padding: 16px 24px;
-			padding-top: max(16px, env(safe-area-inset-top));
-			background: rgba(0,0,0,0.3);
-			backdrop-filter: blur(10px);
+			padding-top: calc(16px + env(safe-area-inset-top, 0px));
+			background: linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.4) 50%, rgba(0,0,0,0.2) 100%);
+			backdrop-filter: blur(20px);
+			-webkit-backdrop-filter: blur(20px);
 			z-index: 100;
 			display: flex;
 			align-items: center;
@@ -1180,7 +1194,10 @@ export default {
 			const now = Date.now();
 			const all = pruneInMemory(await readMessages(env, roomId), now);
 			const out = all.slice(-limit);
-			return withCors(json(out), req);
+			// Find the most recent anchor message
+			const anchors = all.filter(m => m.isAnchor);
+			const currentAnchor = anchors.length > 0 ? anchors[anchors.length - 1].message : null;
+			return withCors(json({ currentAnchor, messages: out }), req);
 		}
 
 		// ===== 兼容旧 /party =====
