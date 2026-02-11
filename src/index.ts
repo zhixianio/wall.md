@@ -562,6 +562,17 @@ function generateRoomHtml(room: Room, lang: Lang, baseUrl?: string): string {
 			.header-links {
 				display: none;
 			}
+			.anchor-text {
+				font-size: 0.9rem;
+				max-width: 80%;
+			}
+			.anchor-icon {
+				font-size: 1.2rem;
+				margin: 0 0.5rem;
+			}
+			.msg-anchor {
+				margin: 1.5rem 0;
+			}
 		}
 		.chat-container {
 			position: fixed;
@@ -679,9 +690,11 @@ function generateRoomHtml(room: Room, lang: Lang, baseUrl?: string): string {
 			font-weight: 600;
 			color: #f59e0b;
 			font-size: 1.1rem;
-			white-space: nowrap;
 			margin: 0 1rem;
 			text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+			word-wrap: break-word;
+			overflow-wrap: break-word;
+			max-width: 70%;
 		}
 		.anchor-meta {
 			font-size: 0.75rem;
