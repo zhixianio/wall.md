@@ -493,6 +493,8 @@ function generateRoomHtml(room: Room, lang: Lang, baseUrl?: string): string {
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+	<meta name="theme-color" content="#1a1a2e">
+	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 	<title>${room.name} | wall.md</title>
 	<style>
 		* { margin: 0; padding: 0; box-sizing: border-box; }
@@ -523,11 +525,12 @@ function generateRoomHtml(room: Room, lang: Lang, baseUrl?: string): string {
 		.header::before {
 			content: '';
 			position: absolute;
-			top: 0; left: 0; right: 0;
+			top: calc(-1 * env(safe-area-inset-top, 0px));
+			left: 0; right: 0;
 			height: env(safe-area-inset-top, 0px);
-			background: inherit;
-			backdrop-filter: inherit;
-			-webkit-backdrop-filter: inherit;
+			background: rgba(0,0,0,0.3);
+			backdrop-filter: blur(10px);
+			-webkit-backdrop-filter: blur(10px);
 		}
 		.header a {
 			color: rgba(255,255,255,0.6);
