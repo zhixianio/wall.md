@@ -36,7 +36,11 @@ function withCors(resp: Response, req: Request) {
 	headers.set("vary", "origin");
 	headers.set("access-control-allow-methods", "GET,POST,OPTIONS");
 	headers.set("access-control-allow-headers", "content-type, accept");
-	return new Response(resp.body, { ...resp, headers });
+	return new Response(resp.body, {
+		status: resp.status,
+		statusText: resp.statusText,
+		headers
+	});
 }
 
 function messagesKey(roomId: string): string {

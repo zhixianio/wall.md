@@ -21,4 +21,5 @@ export type Room = {
 	id: string;
 	name: string;
 	description: string;
+	anchorSecret?: string; // Optional: only present for dynamically created rooms
 };
