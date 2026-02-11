@@ -1,3 +1,6 @@
+import { getRooms } from '../config';
+import type { Env } from '../types';
+
 /**
  * Truncate text to a maximum length
  */
@@ -52,4 +55,45 @@ export function validateReplyTo(replyTo: unknown): string | undefined {
 	if (!replyTo) return undefined;
 	const trimmed = String(replyTo).trim();
 	return trimmed ? trimmed : undefined;
+}
+
+/**
+ * Validate room ID format (lowercase alphanumeric and hyphens only)
+ */
+export function validateRoomId(id: string): boolean {
+	if (!id || typeof id !== "string") return false;
+	// Only allow lowercase letters, numbers, and hyphens
+	return /^[a-z0-9-]+$/.test(id);
+}
+
+/**
+ * Verify anchor secret for a specific room
+ * Uses timing-safe comparison to prevent timing attacks
+ */
+export async function verifyAnchorSecret(
+	roomId: string,
+	secret: string,
+	env: Env
+): Promise<boolean> {
+	const rooms = await getRooms(env);
+	const room = rooms.find(r => r.id === roomId);
+
+	if (!room || !room.anchorSecret) {
+		return false;
+	}
+
+	// Simple constant-time comparison
+	// Note: For production, consider using crypto.subtle.timingSafeEqual if available
+	if (secret.length !== room.anchorSecret.length) {
+		return false;
+	}
+
+	let matches = true;
+	for (let i = 0; i < secret.length; i++) {
+		if (secret[i] !== room.anchorSecret[i]) {
+			matches = false;
+		}
+	}
+
+	return matches;
 }

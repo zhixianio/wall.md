@@ -1,6 +1,7 @@
 export interface Env {
 	CLAWCON_MESSAGES: KVNamespace;
 	ASSETS: Fetcher;
+	ADMIN_SECRETS: string; // Comma-separated secrets for room creation
 }
 
 export type Reactions = {
@@ -21,5 +22,5 @@ export type Room = {
 	id: string;
 	name: string;
 	description: string;
-	anchorSecret?: string; // Secret token to post anchor messages
+	anchorSecret?: string; // Optional: only present for dynamically created rooms
 };
