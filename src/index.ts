@@ -1,4 +1,5 @@
 import { escapeHtml, getAllowedOrigin } from './utils/security';
+import { readMessages, writeMessagesWithPrune } from './utils/kv';
 
 export interface Env {
 	CLAWCON_MESSAGES: KVNamespace;
@@ -158,30 +159,6 @@ function messagesKey(roomId: string): string {
 
 function rateLimitKey(type: "name" | "ip", value: string): string {
 	return `ratelimit:${type}:${value}`;
-}
-
-async function readMessages(env: Env, roomId: string): Promise<StoredMessage[]> {
-	const raw = await env.CLAWCON_MESSAGES.get(messagesKey(roomId));
-	if (!raw) return [];
-	try {
-		const arr = JSON.parse(raw);
-		if (!Array.isArray(arr)) return [];
-		return arr as StoredMessage[];
-	} catch {
-		return [];
-	}
-}
-
-async function writeMessages(env: Env, roomId: string, messages: StoredMessage[]): Promise<void> {
-	await env.CLAWCON_MESSAGES.put(messagesKey(roomId), JSON.stringify(messages));
-}
-
-function prune(messages: StoredMessage[], now = Date.now()): StoredMessage[] {
-	const cutoff = now - MAX_AGE_MS;
-	const filtered = messages
-		.filter((m) => m && typeof m.timestamp === "number" && m.timestamp >= cutoff)
-		.sort((a, b) => a.timestamp - b.timestamp);
-	return filtered.slice(-MAX_MESSAGES);
 }
 
 function parseLimit(s: string | null, max: number, def: number): number {
@@ -966,8 +943,7 @@ export default {
 			if (replyTo) msg.replyTo = replyTo;
 
 			const existing = await readMessages(env, roomId);
-			const next = prune([...existing, msg], now);
-			await writeMessages(env, roomId, next);
+			await writeMessagesWithPrune(env, roomId, [...existing, msg]);
 			
 			// Increment rate limit counters
 			await incrementRateLimit(env, name, ip);
