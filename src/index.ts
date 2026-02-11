@@ -533,6 +533,23 @@ function generateRoomHtml(room: Room, lang: Lang, baseUrl?: string): string {
 		.header-links a:hover {
 			color: #fff;
 		}
+		/* Mobile: hide header links, simplify layout */
+		@media (max-width: 600px) {
+			.header {
+				padding: 12px 16px;
+				gap: 8px;
+			}
+			.header h1 {
+				font-size: 18px;
+			}
+			.header .count {
+				font-size: 12px;
+				white-space: nowrap;
+			}
+			.header-links {
+				display: none;
+			}
+		}
 		.chat-container {
 			position: fixed;
 			top: 70px; bottom: 0; left: 0; right: 0;
