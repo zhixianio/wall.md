@@ -1,3 +1,5 @@
+import type { Env } from '../types';
+
 /**
  * HTML escape to prevent XSS attacks
  */
@@ -42,4 +44,24 @@ export function getAllowedOrigin(requestOrigin: string | null): string {
 
   // Deny others
   return ALLOWED_ORIGINS[0];
+}
+
+/**
+ * Verify admin secret for room creation
+ * Supports multiple secrets (comma-separated) for key rotation
+ */
+export function verifyAdminSecret(
+  authHeader: string | null,
+  env: Env
+): boolean {
+  if (!authHeader) return false;
+  if (!authHeader.startsWith("Bearer ")) return false;
+
+  const token = authHeader.substring(7).trim();
+  if (!token) return false;
+
+  // Split by comma and trim each secret
+  const validSecrets = env.ADMIN_SECRETS.split(",").map(s => s.trim());
+
+  return validSecrets.includes(token);
 }

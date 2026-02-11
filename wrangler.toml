@@ -20,3 +20,7 @@ id = "c6d925a8b4cf48b5b4a8bbe4c7344207"
 
 # Optional: preview id for wrangler dev
 # preview_id = "REPLACE_WITH_PREVIEW_KV_ID"
+
+# Admin secrets for room creation (comma-separated for rotation)
+[vars]
+ADMIN_SECRETS = "dev-secret-2026,backup-secret-2026"

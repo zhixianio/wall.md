@@ -1,6 +1,7 @@
 export interface Env {
 	CLAWCON_MESSAGES: KVNamespace;
 	ASSETS: Fetcher;
+	ADMIN_SECRETS: string; // Comma-separated secrets for room creation
 }
 
 export type Reactions = {
