@@ -3,10 +3,11 @@ main = "src/index.ts"
 compatibility_date = "2025-02-11"
 workers_dev = true
 
-# Custom domain
+# Custom domains
 routes = [
   { pattern = "wall.md", custom_domain = true },
-  { pattern = "www.wall.md", custom_domain = true }
+  { pattern = "www.wall.md", custom_domain = true },
+  { pattern = "wall.zhixian.io", custom_domain = true }
 ]
 
 [assets]
