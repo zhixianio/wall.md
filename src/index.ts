@@ -1,3 +1,5 @@
+import { escapeHtml, getAllowedOrigin } from './utils/security';
+
 export interface Env {
 	CLAWCON_MESSAGES: KVNamespace;
 	ASSETS: Fetcher;
@@ -129,7 +131,7 @@ function html(text: string, init: ResponseInit = {}) {
 }
 
 function withCors(resp: Response, req: Request) {
-	const origin = req.headers.get("origin") || "*";
+	const origin = getAllowedOrigin(req.headers.get("origin"));
 	const headers = new Headers(resp.headers);
 	headers.set("access-control-allow-origin", origin);
 	headers.set("vary", "origin");
