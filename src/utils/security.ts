@@ -60,8 +60,22 @@ export function verifyAdminSecret(
   const token = authHeader.substring(7).trim();
   if (!token) return false;
 
-  // Split by comma and trim each secret
-  const validSecrets = env.ADMIN_SECRETS.split(",").map(s => s.trim());
+  // Check if ADMIN_SECRETS is configured
+  if (!env.ADMIN_SECRETS || !env.ADMIN_SECRETS.trim()) {
+    console.error("[Security] ADMIN_SECRETS not configured");
+    return false;
+  }
+
+  // Split by comma and trim each secret, filter out empty strings
+  const validSecrets = env.ADMIN_SECRETS
+    .split(",")
+    .map(s => s.trim())
+    .filter(s => s.length > 0);
+
+  if (validSecrets.length === 0) {
+    console.error("[Security] No valid secrets configured");
+    return false;
+  }
 
   return validSecrets.includes(token);
 }
