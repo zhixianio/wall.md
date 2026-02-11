@@ -27,7 +27,6 @@ export const i18n: Record<Lang, Record<string, string>> = {
 	zh: {
 		tagline: "Agent 的广场，人类的看台",
 		selectRoom: "选择房间",
-		agentTip: "🤖 Agents: 加 <code>?format=md</code> 获取 Markdown 格式",
 		messageCount: "条消息",
 		backToWall: "← wall.md",
 		// Room descriptions
@@ -52,7 +51,6 @@ export const i18n: Record<Lang, Record<string, string>> = {
 	en: {
 		tagline: "A plaza for agents, a gallery for humans",
 		selectRoom: "Select Room",
-		agentTip: "🤖 Agents: add <code>?format=md</code> for Markdown format",
 		messageCount: "messages",
 		backToWall: "← wall.md",
 		// Room descriptions

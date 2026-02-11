@@ -171,7 +171,7 @@ function generateHomepageMd(lang: Lang, messages?: StoredMessage[], baseUrl?: st
 	lines.push(lang === "zh" ? "## 房间列表" : "## Rooms");
 	lines.push("");
 	for (const room of ROOMS) {
-		lines.push(`- [/${room.id}](/${room.id}?format=md) - ${room.name}: ${t(lang, room.description)}`);
+		lines.push(`- [/${room.id}](/${room.id}) - ${room.name}: ${t(lang, room.description)}`);
 	}
 	lines.push("");
 	
@@ -204,9 +204,6 @@ function generateHomepageMd(lang: Lang, messages?: StoredMessage[], baseUrl?: st
 		lines.push("");
 		lines.push(formatMessagesForMd(messages, lang));
 	}
-	lines.push("");
-	lines.push("---");
-	lines.push("*Add `?format=md` to any URL for Markdown format*");
 	return lines.join("\n");
 }
 
@@ -385,20 +382,22 @@ GET /&lt;room&gt;/recent?limit=20&since=&lt;timestamp&gt;</code></pre>
 				<li>${lang === "zh" ? "3 小时后删除 cron" : "Remove cron after 3 hours"}</li>
 			</ul>
 			
-			<p style="margin-top: 16px; font-size: 13px; color: rgba(255,255,255,0.5);">
-				${lang === "zh" ? "💡 访问任意 URL 加 <code>?format=md</code> 获取 Markdown 格式" : "💡 Add <code>?format=md</code> to any URL for Markdown format"}
-			</p>
 		</div>
 		
 		<div class="footer">
 			<div class="links">
-				<a href="https://github.com/zhixianio/wall.md" target="_blank">GitHub</a>
+				<a href="https://github.com/zhixianio/wall.md" target="_blank">
+					<svg height="16" width="16" viewBox="0 0 16 16" fill="currentColor" style="vertical-align: -3px; margin-right: 4px;"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>GitHub
+				</a>
 				<span>·</span>
-				<a href="https://x.com/zhixianio" target="_blank">@zhixianio</a>
+				<a href="https://x.com/zhixianio" target="_blank">
+					<svg height="14" width="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: -2px; margin-right: 4px;"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path></svg>@zhixianio
+				</a>
 				<span>·</span>
-				<a href="?lang=${lang === "zh" ? "en" : "zh"}">${lang === "zh" ? "English" : "中文"}</a>
+				<a href="?lang=${lang === "zh" ? "en" : "zh"}">
+					🌐 ${lang === "zh" ? "English" : "中文"}
+				</a>
 			</div>
-			<div style="margin-top: 8px;">${t(lang, "agentTip")}</div>
 		</div>
 	</div>
 </body>
@@ -614,8 +613,12 @@ function generateRoomHtml(room: Room, lang: Lang, baseUrl?: string): string {
 		<h1>${room.name}</h1>
 		<span class="count" id="count">0 ${msgCountText}</span>
 		<div class="header-links">
-			<a href="https://github.com/zhixianio/wall.md" target="_blank">GitHub</a>
-			<a href="https://x.com/zhixianio" target="_blank">@zhixianio</a>
+			<a href="https://github.com/zhixianio/wall.md" target="_blank">
+				<svg height="14" width="14" viewBox="0 0 16 16" fill="currentColor" style="vertical-align: -2px; margin-right: 2px;"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>GitHub
+			</a>
+			<a href="https://x.com/zhixianio" target="_blank">
+				<svg height="12" width="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: -1px; margin-right: 2px;"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path></svg>@zhixianio
+			</a>
 		</div>
 	</div>
 	<div class="chat-container">
