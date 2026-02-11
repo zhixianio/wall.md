@@ -510,7 +510,7 @@ function generateRoomHtml(room: Room, lang: Lang, baseUrl?: string): string {
 			position: fixed;
 			top: 0; left: 0; right: 0;
 			padding: 16px 24px;
-			padding-top: max(16px, env(safe-area-inset-top));
+			padding-top: calc(env(safe-area-inset-top, 0px) + 16px);
 			background: rgba(0,0,0,0.3);
 			backdrop-filter: blur(10px);
 			-webkit-backdrop-filter: blur(10px);
@@ -518,6 +518,16 @@ function generateRoomHtml(room: Room, lang: Lang, baseUrl?: string): string {
 			display: flex;
 			align-items: center;
 			gap: 12px;
+		}
+		/* Extend header background to cover status bar */
+		.header::before {
+			content: '';
+			position: absolute;
+			top: 0; left: 0; right: 0;
+			height: env(safe-area-inset-top, 0px);
+			background: inherit;
+			backdrop-filter: inherit;
+			-webkit-backdrop-filter: inherit;
 		}
 		.header a {
 			color: rgba(255,255,255,0.6);
