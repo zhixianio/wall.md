@@ -1,4 +1,4 @@
-import { escapeHtml, getAllowedOrigin } from './utils/security';
+import { escapeHtml, getAllowedOrigin, verifyAdminSecret } from './utils/security';
 import { readMessages, writeMessagesWithPrune, pruneInMemory } from './utils/kv';
 import { json, markdown, html } from './utils/response';
 import {
@@ -22,6 +22,8 @@ import {
 	getClientIP,
 	wantsMarkdown,
 	validateReplyTo,
+	validateRoomId,
+	verifyAnchorSecret,
 } from './utils/validation';
 import { Env, StoredMessage, Room, Reactions } from './types';
 
@@ -608,6 +610,48 @@ function generateRoomHtml(room: Room, lang: Lang, baseUrl?: string): string {
 		.color-5 .message-name { color: #aa96da; }
 		.color-6 .message-name { color: #fcbad3; }
 		.color-7 .message-name { color: #a8d8ea; }
+		/* Anchor message styles */
+		.msg-anchor {
+			margin: 2rem 0;
+			text-align: center;
+			clear: both;
+		}
+		.anchor-line {
+			position: relative;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			padding: 0.75rem 0;
+		}
+		.anchor-line::before,
+		.anchor-line::after {
+			content: '';
+			flex: 1;
+			height: 2px;
+			background: linear-gradient(90deg, transparent, #f59e0b, transparent);
+		}
+		.anchor-icon {
+			margin: 0 1rem;
+			font-size: 1.5rem;
+			animation: pulse 2s ease-in-out infinite;
+		}
+		@keyframes pulse {
+			0%, 100% { opacity: 1; }
+			50% { opacity: 0.6; }
+		}
+		.anchor-text {
+			font-weight: 600;
+			color: #f59e0b;
+			font-size: 1.1rem;
+			white-space: nowrap;
+			margin: 0 1rem;
+			text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+		}
+		.anchor-meta {
+			font-size: 0.75rem;
+			color: #6b7280;
+			margin-top: 0.25rem;
+		}
 	</style>
 </head>
 <body>
@@ -751,6 +795,82 @@ export default {
 			return withCors(new Response(null, { status: 204 }), req);
 		}
 
+		// ===== POST /rooms - Create new room (Admin only) =====
+		if (path === "/rooms" && req.method === "POST") {
+			// Verify admin authentication
+			const authHeader = req.headers.get("authorization");
+			if (!verifyAdminSecret(authHeader, env)) {
+				return withCors(
+					json({ error: "Unauthorized: Invalid admin secret" }, { status: 401 }),
+					req
+				);
+			}
+
+			// Parse and validate request body
+			let body: any;
+			try {
+				body = await req.json();
+			} catch {
+				return withCors(
+					json({ error: "Invalid JSON in request body" }, { status: 400 }),
+					req
+				);
+			}
+
+			const roomId = String(body?.id ?? "").trim().toLowerCase();
+			const roomName = truncate(String(body?.name ?? "").trim(), 100);
+			const roomDescription = truncate(String(body?.description ?? "").trim(), 500);
+
+			// Validate required fields
+			if (!roomId || !roomName || !roomDescription) {
+				return withCors(
+					json({
+						error: "Missing required fields: id, name, description are required"
+					}, { status: 400 }),
+					req
+				);
+			}
+
+			// Validate room ID format
+			if (!validateRoomId(roomId)) {
+				return withCors(
+					json({
+						error: "Invalid room ID format: must be lowercase alphanumeric and hyphens only"
+					}, { status: 400 }),
+					req
+				);
+			}
+
+			// Check if room already exists
+			const existingRooms = await getRooms(env);
+			if (existingRooms.some(r => r.id === roomId)) {
+				return withCors(
+					json({
+						error: `Room with ID '${roomId}' already exists`
+					}, { status: 409 }),
+					req
+				);
+			}
+
+			// Create new room with auto-generated anchorSecret
+			const newRoom: Room = {
+				id: roomId,
+				name: roomName,
+				description: roomDescription,
+				anchorSecret: crypto.randomUUID()
+			};
+
+			// Save to KV
+			const updatedRooms = [...existingRooms, newRoom];
+			await saveRooms(env, updatedRooms);
+
+			// Return created room (including anchorSecret)
+			return withCors(
+				json(newRoom, { status: 201 }),
+				req
+			);
+		}
+
 		// ===== 首页 =====
 		if (path === "/" || path === "") {
 			const lang = detectLang(req);
@@ -785,6 +905,73 @@ export default {
 				return withCors(markdown(generateRoomMd(room, lang, baseUrl)), req);
 			}
 			return withCors(html(generateRoomHtml(room, lang, baseUrl)), req);
+		}
+
+		// ===== POST /:room/anchor - Create anchor message (Authenticated) =====
+		if (subpath === "anchor" && req.method === "POST") {
+			// Parse and validate request body
+			let body: any;
+			try {
+				body = await req.json();
+			} catch {
+				return withCors(
+					json({ error: "Invalid JSON in request body" }, { status: 400 }),
+					req
+				);
+			}
+
+			const anchorSecret = String(body?.anchorSecret ?? "").trim();
+			const name = truncate(String(body?.name ?? "").trim(), 32);
+			const message = truncate(String(body?.message ?? "").trim(), 280);
+
+			// Validate required fields
+			if (!anchorSecret || !name || !message) {
+				return withCors(
+					json({ error: "anchorSecret, name, and message are required" }, { status: 400 }),
+					req
+				);
+			}
+
+			// Verify anchor secret
+			const isValid = await verifyAnchorSecret(roomId, anchorSecret, env);
+			if (!isValid) {
+				return withCors(
+					json({ error: "Invalid anchor secret" }, { status: 403 }),
+					req
+				);
+			}
+
+			// Apply rate limiting (same as regular messages)
+			const ip = getClientIP(req);
+			const rateCheck = await checkRateLimit(env, name, ip);
+			if (!rateCheck.allowed) {
+				return withCors(
+					json({ error: rateCheck.reason }, { status: 429 }),
+					req
+				);
+			}
+
+			// Create anchor message
+			const now = Date.now();
+			const msg: StoredMessage = {
+				id: crypto.randomUUID(),
+				name,
+				message,
+				timestamp: now,
+				isAnchor: true,
+			};
+
+			// Save message
+			const existing = await readMessages(env, roomId);
+			await writeMessagesWithPrune(env, roomId, [...existing, msg]);
+
+			// Increment rate limit counters
+			await incrementRateLimit(env, name, ip);
+
+			return withCors(
+				json({ ok: true, message: msg }, { status: 200 }),
+				req
+			);
 		}
 
 		// ===== /room/send =====
