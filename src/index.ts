@@ -511,9 +511,9 @@ function generateRoomHtml(room: Room, lang: Lang, baseUrl?: string): string {
 			top: 0; left: 0; right: 0;
 			padding: 16px 24px;
 			padding-top: calc(16px + env(safe-area-inset-top, 0px));
-			background: linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.4) 50%, rgba(0,0,0,0.2) 100%);
-			backdrop-filter: blur(20px);
-			-webkit-backdrop-filter: blur(20px);
+			background: rgba(17, 24, 39, 0.85);
+			backdrop-filter: blur(12px);
+			-webkit-backdrop-filter: blur(12px);
 			z-index: 100;
 			display: flex;
 			align-items: center;
