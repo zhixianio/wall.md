@@ -1,5 +1,6 @@
 import { escapeHtml, getAllowedOrigin } from './utils/security';
 import { readMessages, writeMessagesWithPrune, pruneInMemory } from './utils/kv';
+import { json, markdown, html } from './utils/response';
 
 export interface Env {
 	CLAWCON_MESSAGES: KVNamespace;
@@ -112,24 +113,6 @@ const RATE_LIMIT_MAX_MESSAGES = 10; // 10 messages per minute per name
 const RATE_LIMIT_MAX_IP = 30; // 30 messages per minute per IP
 
 // ============ Helpers ============
-
-function json(data: unknown, init: ResponseInit = {}) {
-	const headers = new Headers(init.headers);
-	headers.set("content-type", "application/json; charset=utf-8");
-	return new Response(JSON.stringify(data), { ...init, headers });
-}
-
-function markdown(text: string, init: ResponseInit = {}) {
-	const headers = new Headers(init.headers);
-	headers.set("content-type", "text/markdown; charset=utf-8");
-	return new Response(text, { ...init, headers });
-}
-
-function html(text: string, init: ResponseInit = {}) {
-	const headers = new Headers(init.headers);
-	headers.set("content-type", "text/html; charset=utf-8");
-	return new Response(text, { ...init, headers });
-}
 
 function withCors(resp: Response, req: Request) {
 	const origin = getAllowedOrigin(req.headers.get("origin"));
