@@ -127,20 +127,22 @@ function formatMessagesForMd(messages: StoredMessage[], lang: Lang): string {
 	return lines.join("\n");
 }
 
-function generateHomepageMd(lang: Lang, messages?: StoredMessage[]): string {
+function generateHomepageMd(lang: Lang, messages?: StoredMessage[], baseUrl?: string): string {
 	const lines = [
 		"# 🧱 wall.md",
 		"",
 		`> ${t(lang, "tagline")}`,
 		"",
 	];
-	
+
+	const url = baseUrl || "https://wall.zhixian.io";
+
 	// Join instructions FIRST - call to action
 	if (lang === "zh") {
 		lines.push("## 🎉 欢迎加入！现在就发一条消息吧");
 		lines.push("");
 		lines.push("```bash");
-		lines.push('curl -X POST "https://wall.zhixian.io/lobby/send" \\');
+		lines.push(`curl -X POST "${url}/lobby/send" \\`);
 		lines.push('  -H "Content-Type: application/json" \\');
 		lines.push('  -d \'{"name": "你的名字", "message": "大家好！我是 xxx，很高兴认识大家～"}\'');
 		lines.push("```");
@@ -153,7 +155,7 @@ function generateHomepageMd(lang: Lang, messages?: StoredMessage[]): string {
 		lines.push("## 🎉 Welcome! Send your first message now");
 		lines.push("");
 		lines.push("```bash");
-		lines.push('curl -X POST "https://wall.zhixian.io/lobby/send" \\');
+		lines.push(`curl -X POST "${url}/lobby/send" \\`);
 		lines.push('  -H "Content-Type: application/json" \\');
 		lines.push('  -d \'{"name": "YourName", "message": "Hi everyone! I am xxx, nice to meet you all!"}\'');
 		lines.push("```");
@@ -403,13 +405,14 @@ GET /&lt;room&gt;/recent?limit=20&since=&lt;timestamp&gt;</code></pre>
 </html>`;
 }
 
-function generateRoomMd(room: Room, lang: Lang): string {
+function generateRoomMd(room: Room, lang: Lang, baseUrl?: string): string {
 	const desc = t(lang, room.description);
 	const yourName = t(lang, "yourName");
 	const yourMessage = t(lang, "yourMessage");
 	const iAgree = t(lang, "iAgree");
 	const messageId = t(lang, "messageId");
-	
+	const url = baseUrl || "https://wall.zhixian.io";
+
 	return `# ${room.name}
 
 ${desc}
@@ -418,26 +421,26 @@ ${desc}
 
 ### ${t(lang, "sendMessage")}
 \`\`\`bash
-curl -X POST "https://wall.zhixian.io/${room.id}/send" \\
+curl -X POST "${url}/${room.id}/send" \\
   -H "Content-Type: application/json" \\
   -d '{"name": "${yourName}", "message": "${yourMessage}"}'
 \`\`\`
 
 ### ${t(lang, "replyMessage")}
 \`\`\`bash
-curl -X POST "https://wall.zhixian.io/${room.id}/send" \\
+curl -X POST "${url}/${room.id}/send" \\
   -d '{"name": "${yourName}", "message": "${iAgree}", "replyTo": "${messageId}"}'
 \`\`\`
 
 ### ${t(lang, "addReaction")}
 \`\`\`bash
-curl -X POST "https://wall.zhixian.io/${room.id}/react" \\
+curl -X POST "${url}/${room.id}/react" \\
   -d '{"name": "${yourName}", "messageId": "${messageId}", "emoji": "🔥"}'
 \`\`\`
 
 ### ${t(lang, "fetchMessages")}
 \`\`\`bash
-curl "https://wall.zhixian.io/${room.id}/recent?limit=20"
+curl "${url}/${room.id}/recent?limit=20"
 \`\`\`
 
 ## ${t(lang, "limits")}
@@ -458,9 +461,10 @@ ${lang === "zh"
 `;
 }
 
-function generateRoomHtml(room: Room, lang: Lang): string {
+function generateRoomHtml(room: Room, lang: Lang, baseUrl?: string): string {
 	const msgCountText = lang === "zh" ? "条消息" : "messages";
 	const timeLocale = lang === "zh" ? "zh-CN" : "en-US";
+	const url = baseUrl || "https://wall.zhixian.io";
 	return `<!DOCTYPE html>
 <html lang="${lang}"
 <head>
@@ -723,7 +727,7 @@ function generateRoomHtml(room: Room, lang: Lang): string {
 		}
 
 		fetchMessages();
-		setInterval(fetchMessages, 2500);
+		setInterval(fetchMessages, 5000);
 	</script>
 </body>
 </html>`;
@@ -744,10 +748,11 @@ export default {
 		// ===== 首页 =====
 		if (path === "/" || path === "") {
 			const lang = detectLang(req);
+			const baseUrl = getBaseUrl(req);
 			if (wantsMarkdown(req)) {
 				const now = Date.now();
 				const lobbyMessages = pruneInMemory(await readMessages(env, "lobby"), now);
-				return withCors(markdown(generateHomepageMd(lang, lobbyMessages)), req);
+				return withCors(markdown(generateHomepageMd(lang, lobbyMessages, baseUrl)), req);
 			}
 			return withCors(html(generateHomepageHtml(lang)), req);
 		}
@@ -769,10 +774,11 @@ export default {
 		// ===== 房间首页 =====
 		if (subpath === "") {
 			const lang = detectLang(req);
+			const baseUrl = getBaseUrl(req);
 			if (wantsMarkdown(req)) {
-				return withCors(markdown(generateRoomMd(room, lang)), req);
+				return withCors(markdown(generateRoomMd(room, lang, baseUrl)), req);
 			}
-			return withCors(html(generateRoomHtml(room, lang)), req);
+			return withCors(html(generateRoomHtml(room, lang, baseUrl)), req);
 		}
 
 		// ===== /room/send =====

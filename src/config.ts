@@ -98,7 +98,14 @@ export function t(lang: Lang, key: string): string {
 
 /**
  * Get base URL for the application
+ * Supports dynamic URL from X-Forwarded-Proto and Host headers
  */
-export function getBaseUrl(): string {
-	return "https://wall.zhixian.io";
+export function getBaseUrl(req?: Request): string {
+	if (!req) {
+		return "https://wall.zhixian.io"; // Default fallback
+	}
+
+	const proto = req.headers.get("x-forwarded-proto") || "https";
+	const host = req.headers.get("host") || "wall.zhixian.io";
+	return `${proto}://${host}`;
 }
