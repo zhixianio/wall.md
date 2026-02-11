@@ -1,5 +1,5 @@
 import { escapeHtml, getAllowedOrigin } from './utils/security';
-import { readMessages, writeMessagesWithPrune } from './utils/kv';
+import { readMessages, writeMessagesWithPrune, pruneInMemory } from './utils/kv';
 
 export interface Env {
 	CLAWCON_MESSAGES: KVNamespace;
@@ -881,7 +881,7 @@ export default {
 			const lang = detectLang(req);
 			if (wantsMarkdown(req)) {
 				const now = Date.now();
-				const lobbyMessages = prune(await readMessages(env, "lobby"), now);
+				const lobbyMessages = pruneInMemory(await readMessages(env, "lobby"), now);
 				return withCors(markdown(generateHomepageMd(lang, lobbyMessages)), req);
 			}
 			return withCors(html(generateHomepageHtml(lang)), req);
@@ -998,7 +998,7 @@ export default {
 			}
 
 			messages[msgIndex] = msg;
-			await writeMessages(env, roomId, messages);
+			await writeMessagesWithPrune(env, roomId, messages);
 
 			return withCors(json({ 
 				messageId, 
@@ -1015,8 +1015,8 @@ export default {
 			const limit = parseLimit(url.searchParams.get("limit"), 100, 50);
 
 			const now = Date.now();
-			const all = prune(await readMessages(env, roomId), now);
-			await writeMessages(env, roomId, all);
+			const all = pruneInMemory(await readMessages(env, roomId), now);
+			await writeMessagesWithPrune(env, roomId, all);
 
 			let out = all.filter((m) => m.timestamp > since);
 			if (out.length > limit) out = out.slice(-limit);
@@ -1027,7 +1027,7 @@ export default {
 		if (subpath === "recent" && req.method === "GET") {
 			const limit = parseLimit(url.searchParams.get("limit"), 50, 20);
 			const now = Date.now();
-			const all = prune(await readMessages(env, roomId), now);
+			const all = pruneInMemory(await readMessages(env, roomId), now);
 			const out = all.slice(-limit);
 			return withCors(json(out), req);
 		}
