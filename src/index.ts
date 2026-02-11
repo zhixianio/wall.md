@@ -510,10 +510,10 @@ function generateRoomHtml(room: Room, lang: Lang, baseUrl?: string): string {
 			position: fixed;
 			top: 0; left: 0; right: 0;
 			padding: 16px 24px;
-			padding-top: calc(16px + env(safe-area-inset-top, 0px));
-			background: rgba(17, 24, 39, 0.85);
-			backdrop-filter: blur(12px);
-			-webkit-backdrop-filter: blur(12px);
+			padding-top: max(16px, env(safe-area-inset-top));
+			background: rgba(0,0,0,0.3);
+			backdrop-filter: blur(10px);
+			-webkit-backdrop-filter: blur(10px);
 			z-index: 100;
 			display: flex;
 			align-items: center;
