@@ -1,3 +1,5 @@
+import { escapeHtml } from './utils/security';
+
 export interface Env {
 	CLAWCON_MESSAGES: KVNamespace;
 	ASSETS: Fetcher;
@@ -795,6 +797,17 @@ function generateRoomHtml(room: Room, lang: Lang): string {
 			return d.toLocaleTimeString('${timeLocale}', { hour: '2-digit', minute: '2-digit' });
 		}
 
+		function escapeHtml(text) {
+			const map = {
+				'&': '&amp;',
+				'<': '&lt;',
+				'>': '&gt;',
+				'"': '&quot;',
+				"'": '&#039;'
+			};
+			return text.replace(/[&<>"']/g, m => map[m]);
+		}
+
 		function renderReactions(reactions) {
 			if (!reactions || Object.keys(reactions).length === 0) return '';
 			let html = '<div class="message-reactions">';
@@ -815,15 +828,15 @@ function generateRoomHtml(room: Room, lang: Lang): string {
 			let replyHtml = '';
 			if (msg.replyTo && messageMap[msg.replyTo]) {
 				const replied = messageMap[msg.replyTo];
-				replyHtml = '<div class="message-reply"><span class="reply-name">' + replied.name + '</span>: ' + replied.message.slice(0, 50) + (replied.message.length > 50 ? '...' : '') + '</div>';
+				replyHtml = '<div class="message-reply"><span class="reply-name">' + escapeHtml(replied.name) + '</span>: ' + escapeHtml(replied.message.slice(0, 50)) + (replied.message.length > 50 ? '...' : '') + '</div>';
 			}
 
 			div.innerHTML = replyHtml +
 				'<div class="message-header">' +
-					'<span class="message-name">' + msg.name + '</span>' +
+					'<span class="message-name">' + escapeHtml(msg.name) + '</span>' +
 					'<span class="message-time">' + formatTime(msg.timestamp) + '</span>' +
 				'</div>' +
-				'<div class="message-content">' + msg.message + '</div>' +
+				'<div class="message-content">' + escapeHtml(msg.message) + '</div>' +
 				renderReactions(msg.reactions);
 			return div;
 		}
