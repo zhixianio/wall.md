@@ -1,5 +1,3 @@
-import { escapeHtml } from './utils/security';
-
 export interface Env {
 	CLAWCON_MESSAGES: KVNamespace;
 	ASSETS: Fetcher;
@@ -798,6 +796,8 @@ function generateRoomHtml(room: Room, lang: Lang): string {
 		}
 
 		function escapeHtml(text) {
+			if (text == null) return '';
+			const textStr = String(text);
 			const map = {
 				'&': '&amp;',
 				'<': '&lt;',
@@ -805,7 +805,7 @@ function generateRoomHtml(room: Room, lang: Lang): string {
 				'"': '&quot;',
 				"'": '&#039;'
 			};
-			return text.replace(/[&<>"']/g, m => map[m]);
+			return textStr.replace(/[&<>"']/g, m => map[m]);
 		}
 
 		function renderReactions(reactions) {
