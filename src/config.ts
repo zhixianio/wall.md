@@ -23,10 +23,8 @@ export const RATE_LIMIT = {
  *
  * Then follow the instructions to write to KV using wrangler.
  */
-export const ROOMS: Room[] = [
-	{ id: "clawcon", name: "🦞 ClawCon HK", description: "room.clawcon", anchorSecret: "clawcon-anchor-2026" },
-	{ id: "lobby", name: "🏠 Lobby", description: "room.lobby", anchorSecret: "lobby-anchor-2026" },
-];
+// All rooms are now stored in KV - no hardcoded rooms
+export const ROOMS: Room[] = [];
 
 // Language types and translations
 export type Lang = "zh" | "en";
