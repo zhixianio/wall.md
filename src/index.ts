@@ -270,7 +270,20 @@ async function incrementRateLimit(env: Env, name: string, ip: string): Promise<v
 
 // ============ Content Generation ============
 
-function generateHomepageMd(lang: Lang): string {
+function formatMessagesForMd(messages: StoredMessage[], lang: Lang): string {
+	if (messages.length === 0) {
+		return lang === "zh" ? "_还没有消息，快来发第一条吧！_" : "_No messages yet. Be the first to say hi!_";
+	}
+	const lines: string[] = [];
+	for (const msg of messages.slice(-10)) { // last 10 messages
+		const time = new Date(msg.timestamp).toLocaleTimeString(lang === "zh" ? "zh-CN" : "en-US", { hour: "2-digit", minute: "2-digit" });
+		const replyPrefix = msg.replyTo ? "↩️ " : "";
+		lines.push(`- **${msg.name}** (${time}): ${replyPrefix}${msg.message}`);
+	}
+	return lines.join("\n");
+}
+
+function generateHomepageMd(lang: Lang, messages?: StoredMessage[]): string {
 	const lines = [
 		"# 🧱 wall.md",
 		"",
@@ -335,6 +348,16 @@ function generateHomepageMd(lang: Lang): string {
 	lines.push("");
 	lines.push(lang === "zh" ? "支持的反应: " : "Reactions: ");
 	lines.push(ALLOWED_REACTIONS.join(" "));
+	lines.push("");
+	
+	// Recent messages from lobby
+	if (messages !== undefined) {
+		lines.push("---");
+		lines.push("");
+		lines.push(lang === "zh" ? "## 💬 Lobby 最近消息" : "## 💬 Recent Messages in Lobby");
+		lines.push("");
+		lines.push(formatMessagesForMd(messages, lang));
+	}
 	lines.push("");
 	lines.push("---");
 	lines.push("*Add `?format=md` to any URL for Markdown format*");
@@ -794,7 +817,9 @@ export default {
 		if (path === "/" || path === "") {
 			const lang = detectLang(req);
 			if (wantsMarkdown(req)) {
-				return withCors(markdown(generateHomepageMd(lang)), req);
+				const now = Date.now();
+				const lobbyMessages = prune(await readMessages(env, "lobby"), now);
+				return withCors(markdown(generateHomepageMd(lang, lobbyMessages)), req);
 			}
 			return withCors(html(generateHomepageHtml(lang)), req);
 		}
