@@ -722,6 +722,26 @@ function generateRoomHtml(room: Room, lang: Lang, baseUrl?: string): string {
 
 		function renderMessage(msg, isNew) {
 			const div = document.createElement('div');
+
+			// Check if this is an anchor message
+			if (msg.isAnchor) {
+				div.className = 'msg-anchor';
+
+				const time = new Date(msg.timestamp).toLocaleTimeString('zh-CN', {
+					hour: '2-digit',
+					minute: '2-digit'
+				});
+
+				div.innerHTML = '<div class="anchor-line">' +
+					'<span class="anchor-icon">🎙️</span>' +
+					'<span class="anchor-text">' + escapeHtml(msg.message) + '</span>' +
+				'</div>' +
+				'<div class="anchor-meta">' + escapeHtml(msg.name) + ' · ' + time + '</div>';
+
+				return div;
+			}
+
+			// Regular message rendering (existing code)
 			div.className = 'message ' + getColorClass(msg.name) + (isNew ? ' new' : '');
 			div.id = 'msg-' + msg.id;
 
