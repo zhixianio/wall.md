@@ -887,7 +887,6 @@ export default {
 
 			const now = Date.now();
 			const all = pruneInMemory(await readMessages(env, roomId), now);
-			await writeMessagesWithPrune(env, roomId, all);
 
 			let out = all.filter((m) => m.timestamp > since);
 			if (out.length > limit) out = out.slice(-limit);
