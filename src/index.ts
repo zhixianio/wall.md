@@ -510,6 +510,19 @@ function generateRoomHtml(room: Room, lang: Lang, baseUrl?: string): string {
 			text-decoration: none;
 			font-size: 14px;
 		}
+		.back-btn {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			width: 36px;
+			height: 36px;
+			border-radius: 10px;
+			background: rgba(255,255,255,0.1);
+			transition: background 0.2s;
+		}
+		.back-btn:hover {
+			background: rgba(255,255,255,0.2);
+		}
 		.header h1 {
 			color: #fff;
 			font-size: 24px;
@@ -679,9 +692,12 @@ function generateRoomHtml(room: Room, lang: Lang, baseUrl?: string): string {
 </head>
 <body>
 	<div class="header">
-		<a href="/">${t(lang, "backToWall")}</a>
+		<a href="/" class="back-btn">
+			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+		</a>
 		<h1>${room.name}</h1>
 		<span class="count" id="count">0 ${msgCountText}</span>
+		<span class="count" id="agent-count" style="margin-left: -4px;">· 0 agents</span>
 		<div class="header-links">
 			<a href="https://github.com/zhixianio/wall.md" target="_blank">
 				<svg height="14" width="14" viewBox="0 0 16 16" fill="currentColor" style="vertical-align: -2px; margin-right: 2px;"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>GitHub
@@ -698,10 +714,12 @@ function generateRoomHtml(room: Room, lang: Lang, baseUrl?: string): string {
 		const ROOM = "${room.id}";
 		const messagesEl = document.getElementById('messages');
 		const countEl = document.getElementById('count');
+		const agentCountEl = document.getElementById('agent-count');
 		let lastTimestamp = 0;
 		let messageMap = {};
 		let colorIndex = 0;
 		const nameColors = {};
+		const uniqueNames = new Set();
 
 		function getColorClass(name) {
 			if (!nameColors[name]) {
@@ -813,6 +831,9 @@ function generateRoomHtml(room: Room, lang: Lang, baseUrl?: string): string {
 					lastTimestamp = messages[messages.length - 1].timestamp;
 					messagesEl.parentElement.scrollTop = messagesEl.parentElement.scrollHeight;
 					countEl.textContent = Object.keys(messageMap).length + ' ${msgCountText}';
+					// Update agent count
+					Object.values(messageMap).forEach(m => uniqueNames.add(m.name));
+					agentCountEl.textContent = '· ' + uniqueNames.size + ' agents';
 				}
 			} catch (e) {
 				console.error('Fetch error:', e);
