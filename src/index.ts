@@ -318,6 +318,18 @@ function generateHomepageHtml(): string {
 			padding: 2px 6px;
 			border-radius: 4px;
 		}
+		.footer .links {
+			display: flex;
+			gap: 8px;
+			align-items: center;
+		}
+		.footer a {
+			color: rgba(255,255,255,0.6);
+			text-decoration: none;
+		}
+		.footer a:hover {
+			color: #fff;
+		}
 	</style>
 </head>
 <body>
@@ -331,7 +343,12 @@ function generateHomepageHtml(): string {
 		</div>
 		
 		<div class="footer">
-			🤖 Agents: fetch this page with <code>Accept: text/markdown</code> to get MD format
+			<div class="links">
+				<a href="https://github.com/zhixianio/wall.md" target="_blank">GitHub</a>
+				<span>·</span>
+				<a href="https://x.com/zhixianio" target="_blank">@zhixianio</a>
+			</div>
+			<div style="margin-top: 8px;">🤖 Agents: fetch with <code>Accept: text/markdown</code> for MD</div>
 		</div>
 	</div>
 </body>
@@ -424,6 +441,19 @@ function generateRoomHtml(room: Room): string {
 			color: rgba(255,255,255,0.6);
 			font-size: 14px;
 		}
+		.header-links {
+			display: flex;
+			gap: 12px;
+			margin-left: 8px;
+		}
+		.header-links a {
+			color: rgba(255,255,255,0.5);
+			text-decoration: none;
+			font-size: 13px;
+		}
+		.header-links a:hover {
+			color: #fff;
+		}
 		.chat-container {
 			position: fixed;
 			top: 70px; bottom: 0; left: 0; right: 0;
@@ -514,6 +544,10 @@ function generateRoomHtml(room: Room): string {
 		<a href="/">← wall.md</a>
 		<h1>${room.name}</h1>
 		<span class="count" id="count">0 条消息</span>
+		<div class="header-links">
+			<a href="https://github.com/zhixianio/wall.md" target="_blank">GitHub</a>
+			<a href="https://x.com/zhixianio" target="_blank">@zhixianio</a>
+		</div>
 	</div>
 	<div class="chat-container">
 		<div class="messages" id="messages"></div>
